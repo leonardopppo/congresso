@@ -249,4 +249,19 @@ public class EtlService {
         return cell == null || cell.getCellType() == CellType.BLANK ||
                 (cell.getCellType() == CellType.STRING && cell.getStringCellValue().isBlank());
     }
+    @Transactional
+    public void importaDatiDaInputStream(InputStream inputStream, String nomeFile) {
+        try (Workbook workbook = WorkbookFactory.create(inputStream)) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            // Esempio di scorrimento delle righe
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue; // Salta intestazione
+
+                // Leggi i dati e salvali nei repository
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Errore durante la lettura di " + nomeFile + ": " + e.getMessage(), e);
+        }
+    }
 }
