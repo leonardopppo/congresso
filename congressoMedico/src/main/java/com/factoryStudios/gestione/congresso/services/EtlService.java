@@ -10,9 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -29,25 +31,63 @@ public class EtlService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    /**
+     * Importazione automatica del file Excel posizionato in src/main/resources.
+     * Utilizza la ricerca dinamica per gestire qualsiasi variazione nel nome del file (.xlsx).
+     */
     @Transactional
     public void importaDatiExcel() {
         try {
-            InputStream is = new ClassPathResource("Dataset Evento Congresso 2025.xlsx").getInputStream();
-            Workbook workbook = WorkbookFactory.create(is);
+            // Caricamento diretto tramite ClassPathResource con il nome esatto
+            Resource resource = new ClassPathResource("Dataset Evento Congresso 2025.xlsx");
 
-            // 1. Lettura e popolamento Touchpoint dal foglio 01_Interazioni
+            if (!resource.exists()) {
+                throw new FileNotFoundException("File non trovato nel classpath: " + resource.getFilename());
+            }
+
+            log.info("Avvio importazione file da classpath: {}", resource.getFilename());
+
+            try (InputStream is = resource.getInputStream()) {
+                importaDatiDaInputStream(is, resource.getFilename());
+            }
+        } catch (Exception e) {
+            log.error("Errore durante l'importazione ETL del file di default", e);
+            throw new RuntimeException("Fallimento durante l'elaborazione ETL: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Importazione dinamica riutilizzabile sia da avvio statico che da upload via Controller HTTP.
+     */
+    @Transactional
+    public void importaDatiDaInputStream(InputStream inputStream, String nomeFile) {
+        try (Workbook workbook = WorkbookFactory.create(inputStream)) {
+
+            // Recupero dei fogli per nome o per posizione di fallback
             Sheet sheetInterazioni = workbook.getSheet("01_Interazioni");
+            if (sheetInterazioni == null && workbook.getNumberOfSheets() > 0) {
+                sheetInterazioni = workbook.getSheetAt(0);
+            }
+
+            Sheet sheetPartecipanti = workbook.getSheet("02_Partecipanti");
+            if (sheetPartecipanti == null && workbook.getNumberOfSheets() > 1) {
+                sheetPartecipanti = workbook.getSheetAt(1);
+            }
+
+            if (sheetInterazioni == null || sheetPartecipanti == null) {
+                throw new IllegalArgumentException("Il file Excel non contiene i fogli necessari per l'importazione.");
+            }
+
+            // 1. Lettura e popolamento Touchpoint dal foglio interazioni
             Map<String, Touchpoint> touchpointMap = caricaTouchpoints(sheetInterazioni);
 
-            // 2. Lettura e popolamento Partecipanti e Interazioni dal foglio 02_Partecipanti
-            Sheet sheetPartecipanti = workbook.getSheet("02_Partecipanti");
+            // 2. Lettura e popolamento Partecipanti e Interazioni dal foglio partecipanti
             caricaPartecipantiEInterazioni(sheetPartecipanti, touchpointMap);
 
-            workbook.close();
-            log.info("Importazione ETL completata con successo!");
+            log.info("Importazione ETL completata con successo per il file: {}", nomeFile);
         } catch (Exception e) {
-            log.error("Errore durante l'importazione ETL del file Excel", e);
-            throw new RuntimeException("Fallimento durante l'elaborazione ETL", e);
+            log.error("Errore durante la lettura del file {}", nomeFile, e);
+            throw new RuntimeException("Errore durante la lettura di " + nomeFile + ": " + e.getMessage(), e);
         }
     }
 
@@ -64,7 +104,6 @@ public class EtlService {
             String faseStringa = getCellValueAsString(row.getCell(4));
             String descrizione = getCellValueAsString(row.getCell(5));
 
-            // Salta le righe marcate come Anagrafica
             if ("Anagrafica".equalsIgnoreCase(faseStringa)) {
                 continue;
             }
@@ -80,16 +119,18 @@ public class EtlService {
                     .build();
 
             tp = touchpointRepository.save(tp);
-            map.put(intestazioneFoglio02, tp);
+            map.put(intestazioneFoglio02.trim(), tp);
         }
         return map;
     }
 
     private void caricaPartecipantiEInterazioni(Sheet sheet, Map<String, Touchpoint> touchpointMap) {
         Row headerRow = sheet.getRow(0);
+        if (headerRow == null) return;
+
         List<String> headers = new ArrayList<>();
         for (Cell cell : headerRow) {
-            headers.add(getCellValueAsString(cell));
+            headers.add(getCellValueAsString(cell).trim());
         }
 
         List<Partecipante> partecipantiBatch = new ArrayList<>();
@@ -104,7 +145,7 @@ public class EtlService {
             String tipologia = getCellValueAsString(row.getCell(3));
             String regione = getCellValueAsString(row.getCell(4));
             String canale = getCellValueAsString(row.getCell(5));
-            Boolean inDbDem = parseBoolean(row.getCell(6));
+            Boolean inDbDem = parseBoolean(row.getCell(6)); // Colonna 6: In database DEM
 
             Partecipante partecipante = Partecipante.builder()
                     .excelId(idExcel)
@@ -114,10 +155,11 @@ public class EtlService {
                     .regione(regione)
                     .canaleIngaggio(canale)
                     .inDatabaseDem(inDbDem)
+                    .interazioni(new ArrayList<>())
                     .build();
 
-            // Mappatura delle colonne dei touchpoint (dalla colonna 6 in poi)
-            for (int col = 6; col < headers.size(); col++) {
+            // I touchpoint effettivi partono dalla colonna 7 (DEM inviata)
+            for (int col = 7; col < headers.size(); col++) {
                 String headerName = headers.get(col);
                 Touchpoint tp = touchpointMap.get(headerName);
 
@@ -139,6 +181,15 @@ public class EtlService {
         }
 
         partecipanteRepository.saveAll(partecipantiBatch);
+    }
+
+    private Boolean parseBoolean(Cell cell) {
+        if (cell == null || isCellEmpty(cell)) return false;
+        if (cell.getCellType() == CellType.BOOLEAN) return cell.getBooleanCellValue();
+        if (cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue() == 1.0;
+
+        String val = getCellValueAsString(cell).toLowerCase().trim();
+        return "1".equals(val) || "true".equals(val) || "si".equals(val) || "sì".equals(val) || "x".equals(val) || "vero".equals(val);
     }
 
     private FaseEvento mappaFase(String faseStr) {
@@ -183,14 +234,6 @@ public class EtlService {
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             default -> "";
         };
-    }
-
-    private Boolean parseBoolean(Cell cell) {
-        if (cell == null) return false;
-        if (cell.getCellType() == CellType.BOOLEAN) return cell.getBooleanCellValue();
-        if (cell.getCellType() == CellType.NUMERIC) return cell.getNumericCellValue() == 1.0;
-        String val = getCellValueAsString(cell);
-        return "1".equalsIgnoreCase(val) || "true".equalsIgnoreCase(val);
     }
 
     private Integer parseInteger(Cell cell) {
@@ -248,20 +291,5 @@ public class EtlService {
     private boolean isCellEmpty(Cell cell) {
         return cell == null || cell.getCellType() == CellType.BLANK ||
                 (cell.getCellType() == CellType.STRING && cell.getStringCellValue().isBlank());
-    }
-    @Transactional
-    public void importaDatiDaInputStream(InputStream inputStream, String nomeFile) {
-        try (Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-
-            // Esempio di scorrimento delle righe
-            for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // Salta intestazione
-
-                // Leggi i dati e salvali nei repository
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Errore durante la lettura di " + nomeFile + ": " + e.getMessage(), e);
-        }
     }
 }
