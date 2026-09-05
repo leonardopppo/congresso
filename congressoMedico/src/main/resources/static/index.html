@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Congresso Medico 2025</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .card-chart { min-height: 380px; }
+        .spinner-overlay {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(255,255,255,0.8); z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Navbar Header -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid px-4">
+        <a class="navbar-brand fw-bold" href="#"><i class="fa-solid fa-chart-line me-2"></i>Congresso 2025 - Analytics</a>
+        <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+            <i class="fa-solid fa-file-excel me-1"></i> Carica Excel ETL
+        </button>
+    </div>
+</nav>
+
+<div class="container-fluid px-4">
+
+    <!-- Banner Alert Errore Globale -->
+    <div id="globalErrorAlert" class="alert alert-danger d-none alert-dismissible fade show" role="alert">
+        <span id="globalErrorMessage">Si è verificato un errore durante il recupero dei dati.</span>
+        <button type="button" class="btn-close" onclick="hideError()"></button>
+    </div>
+
+    <!-- Barra Filtri Globali (Soddisfa Sezione 4.3) -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form id="filterForm" class="row g-3 align-items-center">
+                <div class="col-md-3">
+                    <label for="filterStakeholder" class="form-label fw-semibold text-secondary">Tipologia Stakeholder</label>
+                    <select id="filterStakeholder" class="form-select">
+                        <option value="">Tutti gli Stakeholder</option>
+                        <option value="Medico Generico">Medico Generico</option>
+                        <option value="Specialista">Specialista</option>
+                        <option value="KOL">KOL</option>
+                        <option value="Farmacista">Farmacista</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filterCanale" class="form-label fw-semibold text-secondary">Canale di Ingaggio</label>
+                    <select id="filterCanale" class="form-select">
+                        <option value="">Tutti i Canali</option>
+                        <option value="Email Direct">Email Direct</option>
+                        <option value="LinkedIn">LinkedIn</option>
+                        <option value="Agente/Rete">Agente / Rete</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filterRegione" class="form-label fw-semibold text-secondary">Regione</label>
+                    <select id="filterRegione" class="form-select">
+                        <option value="">Tutte le Regioni</option>
+                        <option value="Lombardia">Lombardia</option>
+                        <option value="Lazio">Lazio</option>
+                        <option value="Campania">Campania</option>
+                        <option value="Veneto">Veneto</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="button" class="btn btn-primary w-100" onclick="loadDashboardData()">
+                        <i class="fa-solid fa-filter me-1"></i> Applica Filtri
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetFilters()">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contenitore Grafici -->
+    <div class="position-relative">
+        <!-- Spinner di Caricamento Globale -->
+        <div id="loadingSpinner" class="spinner-overlay d-none">
+            <div class="text-center">
+                <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                <p class="mt-2 text-muted fw-semibold">Elaborazione dati in corso...</p>
+            </div>
+        </div>
+
+        <!-- Stato Risultato Vuoto -->
+        <div id="emptyState" class="text-center py-5 d-none">
+            <i class="fa-solid fa-folder-open fa-3x text-muted mb-3"></i>
+            <h5 class="text-secondary">Nessun dato trovato per i filtri selezionati</h5>
+            <p class="text-muted">Prova a modificare o resettare i filtri di ricerca.</p>
+        </div>
+
+        <!-- Dashboard Content (3 Viste Richieste) -->
+        <div id="dashboardContent" class="row g-4 mb-4">
+
+            <!-- Vista 1: Funnel del Percorso (4.3 & 4.4) -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm card-chart">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-filter-circle-dollar me-2"></i>1. Funnel del Percorso (Pre-evento -> On-site)</h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <canvas id="chartFunnel"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista 2: Confronto Anagrafico Incrociato (4.3 & 4.4) -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm card-chart">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-users-between-lines me-2"></i>2. Tasso di Presenza per Stakeholder & Canale</h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <canvas id="chartConfronto"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista 3: Andamento per Giornata del Congresso (4.3) -->
+            <div class="col-12">
+                <div class="card shadow-sm card-chart">
+                    <div class="card-header bg-white py-3">
+                        <h6 class="m-0 fw-bold text-primary"><i class="fa-solid fa-calendar-days me-2"></i>3. Andamento Accessi e Permanenza per Giornata</h6>
+                    </div>
+                    <div class="card-body p-3">
+                        <canvas id="chartTimeline"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Tabella Partecipanti Paginata (4.2 API Requirement) -->
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 fw-bold text-dark"><i class="fa-solid fa-table me-2"></i>Elenco Partecipanti</h6>
+            <input type="text" id="tableSearch" class="form-control form-control-sm w-25" placeholder="Cerca email..." onkeyup="loadTableData(0)">
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                    <tr>
+                        <th>Email</th>
+                        <th>Stakeholder</th>
+                        <th>Regione</th>
+                        <th>Canale</th>
+                        <th class="text-center">Email Aperta</th>
+                        <th class="text-center">Stand</th>
+                        <th class="text-center">Sala Riservata</th>
+                        <th class="text-center">Simposio</th>
+                    </tr>
+                    </thead>
+                    <tbody id="partecipantiTableBody">
+                    <!-- Righe dinamiche -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center py-2">
+            <span id="pageInfo" class="small text-muted">Pagina 1 di 1</span>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item" id="btnPrevPage"><a class="page-link" href="#" onclick="changePage(-1)">Precedente</a></li>
+                    <li class="page-item" id="btnNextPage"><a class="page-link" href="#" onclick="changePage(1)">Successivo</a></li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal Upload Excel ETL -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Carica Nuovo Dataset Excel</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="modalUploadForm">
+                    <div class="mb-3">
+                        <label for="excelFile" class="form-label">Seleziona file .xlsx</label>
+                        <input class="form-control" type="file" id="excelFile" accept=".xlsx, .xls" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" id="btnModalSubmit">Carica ed Elabora</button>
+                </form>
+                <div id="uploadResultAlert" class="alert mt-3 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Istanziamo le variabili dei grafici per poterli aggiornare/distruggere al re-render
+    let chartFunnelInstance = null;
+    let chartConfrontoInstance = null;
+    let chartTimelineInstance = null;
+
+    let currentPage = 0;
+    const pageSize = 10;
+    let totalPages = 1;
+
+    // Esecuzione all'avvio della pagina
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDashboardData();
+        loadTableData(0);
+    });
+
+    // Metodo principale per scaricare e aggiornare le 3 viste analitiche
+    async function loadDashboardData() {
+        showLoading(true);
+        hideError();
+
+        const params = getFilterParams();
+
+        try {
+            // Eseguiamo le chiamate API in parallelo
+            const [resFunnel, resConfronto, resTimeline] = await Promise.all([
+                fetch(`/api/dashboard/funnel?${params}`),
+                fetch(`/api/dashboard/confronto?${params}`),
+                fetch(`/api/dashboard/timeline?${params}`)
+            ]);
+
+            if (!resFunnel.ok || !resConfronto.ok || !resTimeline.ok) {
+                throw new Error("Errore durante il recupero dei dati aggregati dal server.");
+            }
+
+            const dataFunnel = await resFunnel.json();
+            const dataConfronto = await resConfronto.json();
+            const dataTimeline = await resTimeline.json();
+
+            // Controllo Stato Vuoto
+            if (!dataFunnel || dataFunnel.values.every(v => v === 0)) {
+                showEmptyState(true);
+            } else {
+                showEmptyState(false);
+                renderFunnelChart(dataFunnel);
+                renderConfrontoChart(dataConfronto);
+                renderTimelineChart(dataTimeline);
+            }
+
+        } catch (err) {
+            showError(err.message);
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    // Genera la stringa di query dai filtri
+    function getFilterParams() {
+        const stakeholder = document.getElementById('filterStakeholder').value;
+        const canale = document.getElementById('filterCanale').value;
+        const regione = document.getElementById('filterRegione').value;
+
+        const urlParams = new URLSearchParams();
+        if (stakeholder) urlParams.append('stakeholder', stakeholder);
+        if (canale) urlParams.append('canale', canale);
+        if (regione) urlParams.append('regione', regione);
+
+        return urlParams.toString();
+    }
+
+    function resetFilters() {
+        document.getElementById('filterStakeholder').value = '';
+        document.getElementById('filterCanale').value = '';
+        document.getElementById('filterRegione').value = '';
+        loadDashboardData();
+        loadTableData(0);
+    }
+
+    // 1. Render Grafico Funnel (Orizzontale)
+    function renderFunnelChart(data) {
+        const ctx = document.getElementById('chartFunnel').getContext('2d');
+        if (chartFunnelInstance) chartFunnelInstance.destroy();
+
+        chartFunnelInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels || ['Invito Spedito', 'Email Aperta', 'Stand Visitato', 'Sala Riservata', 'Presenza Simposio'],
+                datasets: [{
+                    label: 'Partecipanti',
+                    data: data.values || [2375, 1420, 850, 410, 290],
+                    backgroundColor: ['#0d6efd', '#0dcaf0', '#ffc107', '#fd7e14', '#198754']
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // 2. Render Grafico Incrociato Stakeholder/Canale
+    function renderConfrontoChart(data) {
+        const ctx = document.getElementById('chartConfronto').getContext('2d');
+        if (chartConfrontoInstance) chartConfrontoInstance.destroy();
+
+        chartConfrontoInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.categories || ['Specialista', 'KOL', 'Medico Generico', 'Farmacista'],
+                datasets: [
+                    {
+                        label: 'Email Direct',
+                        data: data.emailDirect || [65, 80, 45, 30],
+                        backgroundColor: '#0d6efd'
+                    },
+                    {
+                        label: 'LinkedIn',
+                        data: data.linkedIn || [40, 90, 20, 50],
+                        backgroundColor: '#0dcaf0'
+                    },
+                    {
+                        label: 'Agente/Rete',
+                        data: data.agente || [85, 70, 60, 40],
+                        backgroundColor: '#198754'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: false }, y: { beginAtZero: true } }
+            }
+        });
+    }
+
+    // 3. Render Grafico Timeline per Giornata
+    function renderTimelineChart(data) {
+        const ctx = document.getElementById('chartTimeline').getContext('2d');
+        if (chartTimelineInstance) chartTimelineInstance.destroy();
+
+        chartTimelineInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.days || ['Giorno 1 (Mattina)', 'Giorno 1 (Pomeriggio)', 'Giorno 2 (Mattina)', 'Giorno 2 (Pomeriggio)'],
+                datasets: [{
+                    label: 'Presenze In Sala / Stand',
+                    data: data.counts || [420, 680, 890, 310],
+                    borderColor: '#fd7e14',
+                    backgroundColor: 'rgba(253, 126, 20, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+
+    // Caricamento Tabella Pagina Partecipanti
+    async function loadTableData(page) {
+        currentPage = page;
+        const search = document.getElementById('tableSearch').value;
+        const filterParams = getFilterParams();
+
+        try {
+            const res = await fetch(`/api/partecipanti?page=${page}&size=${pageSize}&search=${search}&${filterParams}`);
+            if (!res.ok) throw new Error("Errore recupero tabella partecipanti.");
+
+            const data = await res.json();
+            renderTableRows(data.content || []);
+
+            totalPages = data.totalPages || 1;
+            document.getElementById('pageInfo').textContent = `Pagina ${currentPage + 1} di ${totalPages}`;
+
+            document.getElementById('btnPrevPage').classList.toggle('disabled', currentPage === 0);
+            document.getElementById('btnNextPage').classList.toggle('disabled', currentPage >= totalPages - 1);
+
+        } catch (err) {
+            console.error("Errore tabella:", err);
+        }
+    }
+
+    function renderTableRows(rows) {
+        const tbody = document.getElementById('partecipantiTableBody');
+        tbody.innerHTML = '';
+
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-3 text-muted">Nessun partecipante trovato.</td></tr>`;
+            return;
+        }
+
+        rows.forEach(p => {
+            tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-semibold">${p.email}</td>
+                        <td>${p.stakeholder || '-'}</td>
+                        <td>${p.regione || '-'}</td>
+                        <td>${p.canale || '-'}</td>
+                        <td class="text-center">${badgeBool(p.emailAperta)}</td>
+                        <td class="text-center">${badgeBool(p.visitaStand)}</td>
+                        <td class="text-center">${badgeBool(p.salaRiservata)}</td>
+                        <td class="text-center">${badgeBool(p.presenzaSimposio)}</td>
+                    </tr>
+                `;
+        });
+    }
+
+    function badgeBool(val) {
+        return val
+            ? `<span class="badge bg-success-subtle text-success"><i class="fa-solid fa-check"></i></span>`
+            : `<span class="badge bg-secondary-subtle text-secondary"><i class="fa-solid fa-xmark"></i></span>`;
+    }
+
+    function changePage(delta) {
+        const newPage = currentPage + delta;
+        if (newPage >= 0 && newPage < totalPages) {
+            loadTableData(newPage);
+        }
+    }
+
+    // Gestione Upload Modal
+    document.getElementById('modalUploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById('excelFile');
+        const alertBox = document.getElementById('uploadResultAlert');
+        const btn = document.getElementById('btnModalSubmit');
+
+        if (!fileInput.files[0]) return;
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        btn.disabled = true;
+        btn.textContent = 'Caricamento...';
+
+        try {
+            const response = await fetch('/api/etl/upload', { method: 'POST', body: formData });
+            const text = await response.text();
+
+            alertBox.classList.remove('d-none', 'alert-success', 'alert-danger');
+            if (response.ok) {
+                alertBox.classList.add('alert-success');
+                alertBox.textContent = text;
+                loadDashboardData();
+                loadTableData(0);
+            } else {
+                alertBox.classList.add('alert-danger');
+                alertBox.textContent = text;
+            }
+        } catch (err) {
+            alertBox.classList.remove('d-none');
+            alertBox.classList.add('alert-danger');
+            alertBox.textContent = "Errore durante la connessione al server.";
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Carica ed Elabora';
+        }
+    });
+
+    // Helper UI
+    function showLoading(show) {
+        document.getElementById('loadingSpinner').classList.toggle('d-none', !show);
+    }
+    function showEmptyState(show) {
+        document.getElementById('emptyState').classList.toggle('d-none', !show);
+        document.getElementById('dashboardContent').classList.toggle('d-none', show);
+    }
+    function showError(msg) {
+        document.getElementById('globalErrorMessage').textContent = msg;
+        document.getElementById('globalErrorAlert').classList.remove('d-none');
+    }
+    function hideError() {
+        document.getElementById('globalErrorAlert').classList.add('d-none');
+    }
+</script>
+<div class="container" style="max-width: 500px;">
+    <div class="card p-4 shadow-sm">
+        <h3 class="mb-3">Carica File Congresso</h3>
+        <form id="uploadForm">
+            <div class="mb-3">
+                <input class="form-control" type="file" id="fileInput" accept=".xlsx, .xls" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Invia File</button>
+        </form>
+        <div id="resultMessage" class="mt-3 alert d-none"></div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById('fileInput');
+        const resultMessage = document.getElementById('resultMessage');
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const response = await fetch('/api/etl/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const text = await response.text();
+            resultMessage.className = `mt-3 alert ${response.ok ? 'alert-success' : 'alert-danger'}`;
+            resultMessage.textContent = text;
+        } catch (err) {
+            resultMessage.className = 'mt-3 alert alert-danger';
+            resultMessage.textContent = 'Errore di connessione al server.';
+        }
+    });
+</script>
+</body>
+</html>
