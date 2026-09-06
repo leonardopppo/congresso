@@ -377,7 +377,8 @@
         if (chartTimelineInstance) chartTimelineInstance.destroy();
 
         const days = list.map(item => item.giorno || item.data || 'Giorno');
-        const counts = list.map(item => item.accessi || item.conteggio || item.totale || 0);
+        // Aggiunti visiteStand e totaleInterazioni alla catena di fallback
+        const counts = list.map(item => item.visiteStand || item.totaleInterazioni || item.accessi || item.conteggio || item.totale || 0);
 
         chartTimelineInstance = new Chart(ctx, {
             type: 'line',

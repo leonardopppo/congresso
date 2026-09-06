@@ -125,12 +125,18 @@ public class DashboardService {
         List<Object[]> risultati = interazioneRepository.countVisitePerGiorno(regione, canale);
 
         return risultati.stream().map(r -> {
-            java.time.LocalDate date = (java.time.LocalDate) r[0];
-            Long visite = (Long) r[1];
+            java.time.LocalDate dateObj = (java.time.LocalDate) r[0];
+            Long visiteCount = (Long) r[1];
+            String formattedDate = dateObj != null ? dateObj.format(DATE_FORMATTER) : "N/D";
+
             return AndamentoGiornalieroDTO.builder()
-                    .data(date != null ? date.format(DATE_FORMATTER) : "N/D")
-                    .visiteStand(visite)
-                    .totaleInterazioni(visite)
+                    .data(formattedDate)
+                    .giorno(formattedDate)
+                    .date(formattedDate)
+                    .visiteStand(visiteCount)
+                    .visite(visiteCount)
+                    .totaleInterazioni(visiteCount)
+                    .count(visiteCount)
                     .build();
         }).collect(Collectors.toList());
     }

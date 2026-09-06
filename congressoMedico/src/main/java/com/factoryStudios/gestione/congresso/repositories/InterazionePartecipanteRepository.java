@@ -25,10 +25,10 @@ public interface InterazionePartecipanteRepository extends JpaRepository<Interaz
 
     // Conteggio visite allo stand raggruppate per data (Andamento Giornaliero)
     @Query("SELECT i.valoreData, COUNT(i.id) FROM InterazionePartecipante i " +
-            "WHERE i.touchpoint.codice = 'giorno_visita' " +
+            "WHERE LOWER(i.touchpoint.codice) LIKE '%giorno%' " +
             "AND i.valoreData IS NOT NULL " +
-            "AND (:regione IS NULL OR i.partecipante.regione = :regione) " +
-            "AND (:canale IS NULL OR i.partecipante.canaleIngaggio = :canale) " +
+            "AND (:regione IS NULL OR :regione = '' OR LOWER(i.partecipante.regione) = LOWER(:regione)) " +
+            "AND (:canale IS NULL OR :canale = '' OR LOWER(i.partecipante.canaleIngaggio) = LOWER(:canale)) " +
             "GROUP BY i.valoreData " +
             "ORDER BY i.valoreData ASC")
     List<Object[]> countVisitePerGiorno(
