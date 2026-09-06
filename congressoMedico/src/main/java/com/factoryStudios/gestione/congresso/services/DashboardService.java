@@ -105,10 +105,12 @@ public class DashboardService {
 
             dtos.add(ConfrontoAnagraficoDTO.builder()
                     .categoria(cat)
+                    .stakeholder(cat)
                     .totalePartecipanti((long) lista.size())
                     .emailDirect(countEmailDirect)
                     .linkedIn(countLinkedIn)
-                    .agenteRete(countAgenteRete)
+                    .agente(countAgenteRete)       // Valorizza item.agente
+                    .agenteRete(countAgenteRete)   // Valorizza item.agenteRete
                     .build());
         }
 

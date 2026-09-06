@@ -9,6 +9,7 @@ import lombok.*;
 public class ConfrontoAnagraficoDTO {
 
     private String categoria;           // Es: "HCP - Diabetologo"
+    private String stakeholder;
     private Long totalePartecipanti;    // Totale partecipanti per categoria
     private Long visiteStand;           // Interazioni stand
     private Long presenzeSimposio;      // Interazioni simposio
@@ -17,5 +18,6 @@ public class ConfrontoAnagraficoDTO {
     // Campi richiesti dal grafico "Confronto Tipologie Stakeholder"
     private Long emailDirect;           // Conteggio Database DEM
     private Long linkedIn;              // Conteggio LinkedIn
-    private Long agenteRete;            // Conteggio On-site (stand + simposio)
+    private Long agente;       // Mappato per il tuo JS (item.agente)
+    private Long agenteRete;   // Mappato per sicurezza
 }
