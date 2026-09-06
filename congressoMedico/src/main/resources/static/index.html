@@ -320,7 +320,8 @@
         const ctx = document.getElementById('chartFunnel').getContext('2d');
         if (chartFunnelInstance) chartFunnelInstance.destroy();
 
-        const labels = list.map(item => item.stepName || item.fase || item.nomeStep || 'Step');
+        // Inserito item.step come prima scelta
+        const labels = list.map(item => item.step || item.stepName || item.nomeStep || item.fase || 'Step');
         const values = list.map(item => item.count || item.conteggio || item.valore || 0);
 
         chartFunnelInstance = new Chart(ctx, {
