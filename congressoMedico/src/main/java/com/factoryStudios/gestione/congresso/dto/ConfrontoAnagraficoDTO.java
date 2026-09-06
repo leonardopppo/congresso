@@ -8,9 +8,14 @@ import lombok.*;
 @Builder
 public class ConfrontoAnagraficoDTO {
 
-    private String categoria;        // Es: "HCP - Diabetologo" oppure "Lombardia"
-    private Long totalePartecipanti; // Quanti sono in quella categoria
-    private Long visiteStand;        // Quanti hanno visitato lo stand
-    private Long presenzeSimposio;   // Quanti erano al simposio
-    private Double tassoPartecipazione; // % di ingaggio incrociata
+    private String categoria;           // Es: "HCP - Diabetologo"
+    private Long totalePartecipanti;    // Totale partecipanti per categoria
+    private Long visiteStand;           // Interazioni stand
+    private Long presenzeSimposio;      // Interazioni simposio
+    private Double tassoPartecipazione; // Percentuale
+
+    // Campi richiesti dal grafico "Confronto Tipologie Stakeholder"
+    private Long emailDirect;           // Conteggio Database DEM
+    private Long linkedIn;              // Conteggio LinkedIn
+    private Long agenteRete;            // Conteggio On-site (stand + simposio)
 }

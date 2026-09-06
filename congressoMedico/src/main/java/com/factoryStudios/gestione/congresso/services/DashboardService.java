@@ -64,10 +64,58 @@ public class DashboardService {
         return mappaAConfrontoDTO(risultati);
     }
 
-    // Calcola l'aggregazione per Tipologia Stakeholder
+    // Calcola la suddivisione Stakeholder vs Canali (Email Direct, LinkedIn, Agente/Rete)
     public List<ConfrontoAnagraficoDTO> getConfrontoStakeholder(String regione, String canale) {
-        List<Object[]> risultati = interazioneRepository.findAggregatesByStakeholder(regione, canale);
-        return mappaAConfrontoDTO(risultati);
+        List<Partecipante> partecipanti = partecipanteRepository.findAll();
+
+        // Applicazione filtri opzionali
+        if (regione != null && !regione.isBlank()) {
+            partecipanti = partecipanti.stream()
+                    .filter(p -> regione.equalsIgnoreCase(p.getRegione()))
+                    .collect(Collectors.toList());
+        }
+        if (canale != null && !canale.isBlank()) {
+            partecipanti = partecipanti.stream()
+                    .filter(p -> canale.equalsIgnoreCase(p.getCanaleIngaggio()))
+                    .collect(Collectors.toList());
+        }
+
+        // Raggruppa per Tipologia Stakeholder
+        Map<String, List<Partecipante>> perStakeholder = partecipanti.stream()
+                .filter(p -> p.getTipologiaStakeholder() != null)
+                .collect(Collectors.groupingBy(Partecipante::getTipologiaStakeholder));
+
+        List<ConfrontoAnagraficoDTO> dtos = new ArrayList<>();
+
+        for (Map.Entry<String, List<Partecipante>> entry : perStakeholder.entrySet()) {
+            String cat = entry.getKey();
+            List<Partecipante> lista = entry.getValue();
+
+            long countEmailDirect = lista.stream()
+                    .filter(p -> "Database DEM".equalsIgnoreCase(p.getCanaleIngaggio()))
+                    .count();
+
+            long countLinkedIn = lista.stream()
+                    .filter(p -> "LinkedIn".equalsIgnoreCase(p.getCanaleIngaggio()))
+                    .count();
+
+            long countAgenteRete = lista.stream()
+                    .filter(p -> p.getCanaleIngaggio() != null && p.getCanaleIngaggio().toLowerCase().contains("on-site"))
+                    .count();
+
+            dtos.add(ConfrontoAnagraficoDTO.builder()
+                    .categoria(cat)
+                    .totalePartecipanti((long) lista.size())
+                    .emailDirect(countEmailDirect)
+                    .linkedIn(countLinkedIn)
+                    .agenteRete(countAgenteRete)
+                    .build());
+        }
+
+        // Ordina le categorie alfabeticamente per l'asse X del grafico
+        dtos.sort(Comparator.comparing(ConfrontoAnagraficoDTO::getCategoria));
+
+        return dtos;
     }
 
     // Calcola l'andamento giornaliero delle visite allo stand
