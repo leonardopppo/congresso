@@ -224,16 +224,11 @@ public class EtlService {
         }
     }
 
+    private static final DataFormatter DATA_FORMATTER_POI = new DataFormatter();
+
     private String getCellValueAsString(Cell cell) {
         if (cell == null) return "";
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
-                    ? cell.getLocalDateTimeCellValue().toLocalDate().format(DATE_FORMATTER)
-                    : String.valueOf((long) cell.getNumericCellValue());
-            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            default -> "";
-        };
+        return DATA_FORMATTER_POI.formatCellValue(cell).trim();
     }
 
     private Integer parseInteger(Cell cell) {
