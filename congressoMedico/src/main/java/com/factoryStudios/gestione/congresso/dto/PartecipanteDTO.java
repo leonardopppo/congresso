@@ -17,12 +17,19 @@ public class PartecipanteDTO {
     private Long excelId;
     private String nomeCognome;
     private String email;
-    private String tipologiaStakeholder;
     private String regione;
-    private String canaleIngaggio;
     private Boolean inDatabaseDem;
 
-    // Nomi dei campi per la tabella JavaScript
+    // Nomi standard Backend
+    private String tipologiaStakeholder;
+    private String canaleIngaggio;
+
+    // ALIAS per il Frontend JavaScript (risolvono qualsiasi nome cercato in index.html)
+    private String stakeholder;
+    private String tipologia;
+    private String canale;
+
+    // Touchpoint booleani
     private Boolean emailAperta;
     private Boolean visitaStand;
     private Boolean salaRiservata;
@@ -51,7 +58,6 @@ public class PartecipanteDTO {
                     String nomeLower = nomeTp.toLowerCase().trim();
 
                     if (isValorePositivo(valore)) {
-                        // Matching esatto basato sulle colonne del foglio 02
                         if (nomeLower.contains("dem aperta")) emailApertaVal = true;
                         if (nomeLower.contains("visita stand")) standVal = true;
                         if (nomeLower.contains("hospitality suite") || nomeLower.contains("sala vip")) salaRiservataVal = true;
@@ -66,10 +72,15 @@ public class PartecipanteDTO {
                 .excelId(p.getExcelId())
                 .nomeCognome(p.getNomeCognome())
                 .email(p.getEmail())
-                .tipologiaStakeholder(p.getTipologiaStakeholder())
                 .regione(p.getRegione())
-                .canaleIngaggio(p.getCanaleIngaggio())
                 .inDatabaseDem(p.getInDatabaseDem())
+                // Mappatura di tutte le varianti di nome per JS
+                .tipologiaStakeholder(p.getTipologiaStakeholder())
+                .stakeholder(p.getTipologiaStakeholder())
+                .tipologia(p.getTipologiaStakeholder())
+                .canaleIngaggio(p.getCanaleIngaggio())
+                .canale(p.getCanaleIngaggio())
+                // Touchpoint booleani
                 .emailAperta(emailApertaVal)
                 .visitaStand(standVal)
                 .salaRiservata(salaRiservataVal)
