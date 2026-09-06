@@ -1,27 +1,32 @@
+# Dashboard Analytics - Congresso Medico 2025
+
 Piattaforma web per la digitalizzazione, la normalizzazione e l'analisi dei dati di ingaggio dei partecipanti al Congresso Medico 2025. Il sistema importa i dati grezzi da file Excel, li mappa su un database relazionale e fornisce un'interfaccia con grafici interattivi e tabelle paginate.
 
-1. Guida all'Avvio
-Requisiti di Sistema
-Java: JDK 17 o superiore
+---
 
-Maven: 3.8+ (oppure l'eseguibile mvnw incluso)
+## 1. Guida all'Avvio
 
-Browser Web: Chrome, Firefox, Edge o Safari recenti
+### Requisiti di Sistema
+* **Java**: JDK 25 (o superiore)
+* **Maven / Gradle**: Gradle o Maven (con wrapper incluso nel progetto)
+* **Browser Web**: Chrome, Firefox, Edge o Safari recenti
 
-Istruzioni Passaggio per Passaggio
-Posizionarsi nella cartella di progetto:
+### Istruzioni Passaggio per Passaggio
 
-Bash
-cd congresso/congressoMedico
+1. **Posizionarsi nella cartella di progetto**:
+   ```bash
+   cd congresso/congressoMedico
 Compilazione ed Esecuzione dell'Applicazione:
-Con Maven Wrapper (Linux/macOS):
+Con Gradle Wrapper (Linux/macOS):
 
 Bash
-./mvnw clean spring-boot:run
-Con Maven Wrapper (Windows):
+./gradlew bootRun
+Con Gradle Wrapper (Windows):
 
 DOS
-mvnw.cmd clean spring-boot:run
+gradlew.bat bootRun
+(Oppure tramite Maven se presente il wrapper ./mvnw clean spring-boot:run)
+
 Inizializzazione del Database ed ETL:
 All'avvio, il servizio EtlService rileva automaticamente il file Dataset_Evento_Congresso_2025.xlsx presente in src/main/resources/ (o percorso configurato in application.properties), crea lo schema relazionale tramite Hibernate/JPA e popola il database.
 
@@ -32,7 +37,7 @@ Plaintext
 http://localhost:8080
 2. Scelte Tecniche e Architettura
 Backend
-Spring Boot 3 (Java 17): Garantisce robustezza, type safety ed elevata manutenibilità.
+Spring Boot 3 (Java 25): Sfrutta le ultime novità e performance del JDK 25, garantendo type safety, robustezza ed elevata manutenibilità.
 
 Spring Data JPA / Hibernate: Gestione dell'ORM e query astratte tramite Repository.
 
@@ -84,7 +89,7 @@ Canali d'Ingaggio Eterogenei: Mappatura diretta tra i valori del DB (Database DE
 Osservazioni Principali
 Conversione per Canale d'Ingaggio: Il canale Database DEM genera il volume assoluto più alto di partecipanti (1.846), ma la presenza fisica allo stand ed al simposio mostra una percentuale di conversione proporzionalmente più elevata tra chi è stato ingaggiato via LinkedIn o tramite contatto diretto On-site.
 
-Distribuzione degli Stakeholder: I medici specializzati in HCP - Diabetologo rappresentano il segmento numericamente più rilevante (723 partecipanti complessivi), seguito da HCP - Medico di medicina generale e HCP - Infermiere / Educatore.
+Distribuzione degli Stakeholder: I medici specializzati in HCP - Diabetologo representan il segmento numericamente più rilevante (723 partecipanti complessivi), seguito da HCP - Medico di medicina generale e HCP - Infermiere / Educatore.
 
 Picchi di Presenza On-Site: Le interazioni registrate allo stand e nella sala VIP si concentrano principalmente nelle prime due giornate dell'evento, con un calo fisiologico durante la sessione conclusiva.
 
